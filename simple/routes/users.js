@@ -2,6 +2,7 @@
 
 const db = require("../db");
 const express = require("express");
+const ExpressError = require("../expressError");
 const router = express.Router();
 
 
@@ -25,7 +26,23 @@ router.get("/", async function (req, res, next) {
     const results = await db.query(
           `SELECT id, name, type FROM users`);
 
-    return res.json(results.rows);
+    return res.json({users: results.rows});
+  }
+
+  catch (err) {
+    return next(err);
+  }
+});
+
+
+router.get("/:id", async function (req, res, next) {
+  try {
+    const { id } = req.params;
+    const results = await db.query(`SELECT * FROM users WHERE id=$1`, [id]);
+    if (results.rows.length === 0){
+      throw new ExpressError(`Can't find user with id of: ${id}`, 404)
+    }
+    return res.send({user: results.rows[0]});
   }
 
   catch (err) {
@@ -94,7 +111,7 @@ router.post("/", async function (req, res, next) {
         [name, type]
     );
 
-    return res.status(201).json(result.rows[0]);
+    return res.status(201).json({user: result.rows[0]});
   }
 
   catch (err) {
@@ -107,20 +124,21 @@ router.post("/", async function (req, res, next) {
 
 router.patch("/:id", async function (req, res, next) {
   try {
+    const { id } = req.params;
     const { name, type } = req.body;
-
     const result = await db.query(
           `UPDATE users SET name=$1, type=$2
            WHERE id = $3
            RETURNING id, name, type`,
         [name, type, req.params.id]
     );
-
-    return res.json(result.rows[0]);
+    if (result.rows.length === 0){
+      throw new ExpressError(`Can't update user with id of: ${id}`, 404);
+    }
+    return res.send({user: result.rows[0]});
   }
-
-  catch (err) {
-    return next(err);
+  catch (e) {
+    return next(e);
   }
 });
 
@@ -134,11 +152,11 @@ router.delete("/:id", async function (req, res, next) {
         [req.params.id]
     );
 
-    return res.json({message: "Deleted"});
+    return res.send({message: "Deleted"}, 200);
   }
 
-  catch (err) {
-    return next(err);
+  catch (e) {
+    return next(e);
   }
 });
 // end
